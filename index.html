@@ -370,6 +370,523 @@
   scene.add(pipeBetween(pipeB0,pipeB1,0.03,0xb5bcc2));
 
   // =========================================================================
+  // ROOF PENETRATION MARKER — marks where ducts pass through the roof slab (the
+  // existing ground plane serves as the roof surface the AHU/ACCU sit on)
+  // =========================================================================
+  const roofPenRing = new THREE.Mesh(new THREE.TorusGeometry(0.32,0.035,10,24), new THREE.MeshStandardMaterial({color:0x556270}));
+  roofPenRing.rotation.x = Math.PI/2;
+  roofPenRing.position.set(-6.4, 0.02, 0.4);
+  scene.add(roofPenRing);
+  const roofPenLabel = sprite('ROOF PENETRATION', {fontSize:20, scale:0.3, color:'#556270', bg:'rgba(255,255,255,.85)'});
+  roofPenLabel.position.set(-6.4, 0.5, 0.4);
+  scene.add(roofPenLabel);
+
+  const roomTempSprite = sprite('24.5°C', {fontSize:46, scale:0.62, color:'#b91c2c', bg:'rgba(255,255,255,0.92)', border:'#FF4757'});
+  roomTempSprite.position.set(-6.4, -1.85, 0.8);
+  scene.add(roomTempSprite);
+  const roomLbl = sprite('DEPARTMENT (below roof)', {fontSize:26, scale:0.42, color:'#5a4a20', bg:'rgba(255,250,235,0.92)', border:'#c8ac5a'});
+  roomLbl.position.set(-6.4, -1.3, 0.8);
+  scene.add(roomLbl);
+
+  // =========================================================================
+  // SUPPLY DUCT — exits AHU, runs left, then drops THROUGH the roof to the
+  // department below (per field photo + the original roof/corridor drop concept)
+  // =========================================================================
+  function tubeBetween(p0,p1,p2,p3,radius,color,opacity){
+    const curve = new THREE.CubicBezierCurve3(p0,p1,p2,p3);
+    const geo = new THREE.TubeGeometry(curve, 40, radius, 10, false);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.5, transparent:opacity!==undefined, opacity: opacity!==undefined?opacity:1 });
+    const m = new THREE.Mesh(geo, mat); m.castShadow=true;
+    return m;
+  }
+  // Segment 1: AHU outlet -> roof penetration point (horizontal run at roof level)
+  const supA0 = new THREE.Vector3(-ahuW/2, ahuH*0.75, 0).add(ahuGroup.position);
+  const supA3 = new THREE.Vector3(-6.4, 0.55, 0.4);
+  const supA1 = new THREE.Vector3(supA0.x-1.4, supA0.y+0.25, supA0.z);
+  const supA2 = new THREE.Vector3(supA3.x+0.9, supA3.y+0.9, supA3.z);
+  const supplyTubeTop = tubeBetween(supA0,supA1,supA2,supA3, 0.22, 0xFF9142);
+  scene.add(supplyTubeTop);
+  // Segment 2: straight drop through the roof slab down to the department below
+  const supB0 = supA3.clone();
+  const supB3 = new THREE.Vector3(-6.4, -2.2, 0.4);
+  const dropTube = pipeBetween(supB0, supB3, 0.22, 0xFF9142);
+  scene.add(dropTube);
+  const supplyArrowHead = arrow(new THREE.Vector3(0,-1,0), supB3.clone().add(new THREE.Vector3(0,0.6,0)), 0.6, 0xFF9142, 0.24);
+  scene.add(supplyArrowHead);
+  const supplyLabel = sprite('SUPPLY (existing, connected)', {fontSize:24, scale:0.4, color:'#8a4310', bg:'rgba(255,240,225,0.92)', border:'#FF9142'});
+  supplyLabel.position.copy(supA1).add(new THREE.Vector3(0,0.55,0));
+  scene.add(supplyLabel);
+
+  // =========================================================================
+  // RETURN DUCT — routed exactly per the field annotation: UP from AHU top, then LEFT
+  // (orange highlighted path in the reference photo)
+  // =========================================================================
+  const retStart = new THREE.Vector3(-ahuW/2+ahuW*0.16, ahuH, ahuD/2-0.35).add(ahuGroup.position); // top of AHU, above door section
+  const retUp    = retStart.clone().add(new THREE.Vector3(0, 1.35, 0));                              // vertical run
+  const retEnd   = retUp.clone().add(new THREE.Vector3(-2.3, 0, 0));                                 // horizontal run left, toward dept. duct
+
+  const returnGroup = new THREE.Group();
+  scene.add(returnGroup);
+
+  const vertDuctGeo = new THREE.CylinderGeometry(0.16,0.16, retUp.distanceTo(retStart), 12);
+  const vertMat = new THREE.MeshStandardMaterial({color:0xC2185B, roughness:0.5, transparent:true, opacity:0.25});
+  const vertDuct = new THREE.Mesh(vertDuctGeo, vertMat);
+  vertDuct.position.copy(retStart).lerp(retUp,0.5);
+  returnGroup.add(vertDuct);
+
+  const horizDuctGeo = new THREE.CylinderGeometry(0.16,0.16, retUp.distanceTo(retEnd), 12);
+  const horizMat = new THREE.MeshStandardMaterial({color:0xC2185B, roughness:0.5, transparent:true, opacity:0.25});
+  const horizDuct = new THREE.Mesh(horizDuctGeo, horizMat);
+  horizDuct.position.copy(retUp).lerp(retEnd,0.5);
+  horizDuct.rotation.z = Math.PI/2;
+  returnGroup.add(horizDuct);
+
+  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.17,12,12), new THREE.MeshStandardMaterial({color:0xC2185B, transparent:true, opacity:0.25}));
+  elbow.position.copy(retUp);
+  returnGroup.add(elbow);
+
+  const returnArrowHead = arrow(new THREE.Vector3(-1,0,0), retEnd.clone().add(new THREE.Vector3(0.3,0,0)), 0.6, 0xC2185B, 0.24);
+  returnGroup.add(returnArrowHead);
+  const returnLabel = sprite('RETURN — per field route (up, then left)', {fontSize:22, scale:0.36, color:'#7a0f3d', bg:'rgba(255,231,240,0.92)', border:'#C2185B'});
+  returnLabel.position.copy(retUp).add(new THREE.Vector3(-0.4,0.4,0));
+  returnGroup.add(returnLabel);
+
+  // seal cap (existing mode) — right at the AHU top connection point (matches field annotation start)
+  const sealCap = new THREE.Mesh(new THREE.CylinderGeometry(0.19,0.19,0.07,20), new THREE.MeshStandardMaterial({color:0xFF4757}));
+  sealCap.rotation.x = Math.PI/2; sealCap.position.copy(retStart);
+  scene.add(sealCap);
+  const sealLabel = sprite('SEALED HERE', {fontSize:24, scale:0.36, color:'#8f1d29', bg:'rgba(255,224,224,0.95)', border:'#FF4757'});
+  sealLabel.position.copy(retStart).add(new THREE.Vector3(0,0.4,0.3));
+  scene.add(sealLabel);
+
+  // mixing-point indicator — glows and blends OA(red)+RA(magenta) colors once the return is opened (Proposed)
+  const mixGlow = new THREE.Mesh(new THREE.SphereGeometry(0.16,16,16), new THREE.MeshBasicMaterial({color:0xFF9142, transparent:true, opacity:0}));
+  mixGlow.position.copy(retStart);
+  scene.add(mixGlow);
+  const mixLabel = sprite('MIXING — ~25% OA / ~75% RETURN', {fontSize:22, scale:0.32, color:'#8a4310', bg:'rgba(255,240,225,0.95)', border:'#FF9142'});
+  mixLabel.position.copy(retStart).add(new THREE.Vector3(0,0.42,-0.35));
+  mixLabel.visible = false;
+  scene.add(mixLabel);
+
+  // =========================================================================
+  // Animated flow particles along the ducts
+  // =========================================================================
+  function makeFlowParticlesLine(pA,pB,count,color,size){
+    const items = [];
+    const geo = new THREE.SphereGeometry(size,8,8);
+    for(let i=0;i<count;i++){
+      const mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:1});
+      const m = new THREE.Mesh(geo, mat);
+      m.userData.t = i/count;
+      scene.add(m); items.push(m);
+    }
+    return { pA, pB, items };
+  }
+  const raFlow1 = makeFlowParticlesLine(retStart, retUp, 6, 0xC2185B, 0.065);
+  const raFlow2 = makeFlowParticlesLine(retUp, retEnd, 7, 0xC2185B, 0.065);
+
+  function makeFlowParticlesCurve(p0,p1,p2,p3,count,color,size){
+    const curve = new THREE.CubicBezierCurve3(p0,p1,p2,p3);
+    const items = [];
+    const geo = new THREE.SphereGeometry(size,8,8);
+    for(let i=0;i<count;i++){
+      const mat = new THREE.MeshBasicMaterial({color});
+      const m = new THREE.Mesh(geo, mat);
+      m.userData.t = i/count;
+      scene.add(m); items.push(m);
+    }
+    return { curve, items };
+  }
+  const supFlow = makeFlowParticlesCurve(supA0,supA1,supA2,supA3, 7, 0xFF9142, 0.075);
+  const supFlowDrop = makeFlowParticlesLine(supB0, supB3, 6, 0xFF9142, 0.075);
+
+  // Fresh (outside) air intake — small arrow into AHU mixing/filter end, always active
+  const oaOrigin = new THREE.Vector3(-ahuW/2-0.2, ahuH+1.4, -1.0).add(ahuGroup.position);
+  const oaArrow = arrow(new THREE.Vector3(0.25,-0.7,0.55), oaOrigin, 1.5, 0xFF5C4D, 0.3);
+  scene.add(oaArrow);
+  const oaLabel = sprite('FRESH AIR 110°F', {fontSize:26, scale:0.4, color:'#8a2418', bg:'rgba(255,232,228,0.92)', border:'#FF5C4D'});
+  oaLabel.position.copy(oaOrigin).add(new THREE.Vector3(0,0.35,0));
+  scene.add(oaLabel);
+  const oaCurve = new THREE.CubicBezierCurve3(
+    oaOrigin.clone(), oaOrigin.clone().add(new THREE.Vector3(0.1,-0.28,0.2)),
+    oaOrigin.clone().add(new THREE.Vector3(0.2,-0.5,0.4)), oaOrigin.clone().add(new THREE.Vector3(0.3,-0.68,0.55))
+  );
+  const oaFlowItems = [];
+  for(let i=0;i<6;i++){
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), new THREE.MeshBasicMaterial({color:0xFF5C4D}));
+    m.userData.t = i/6; scene.add(m); oaFlowItems.push(m);
+  }
+
+  // =========================================================================
+  // STATE / TOGGLE
+  // =========================================================================
+  const state = { transition:0, target:0 };
+  let labelsVisible = true;
+  function lerp(a,b,t){return a+(b-a)*t;}
+
+  function animate(now){
+    requestAnimationFrame(animate);
+    state.transition += (state.target-state.transition)*0.05;
+    const tr = state.transition;
+
+    fanWheel.rotation.z += 0.15;
+
+    // OA particles always flow
+    oaFlowItems.forEach(m=>{
+      m.userData.t += 0.006; if(m.userData.t>1) m.userData.t-=1;
+      const p = oaCurve.getPoint(m.userData.t); m.position.copy(p);
+    });
+    // Return particles: speed scales with transition (0 in existing = stationary/hidden); two straight segments (up, then left)
+    const raOpacity = lerp(0.22, 0.9, tr);
+    vertDuct.material.opacity = raOpacity; horizDuct.material.opacity = raOpacity; elbow.material.opacity = raOpacity;
+    const raColor = lerp(0.3, 1.0, tr);
+    [raFlow1, raFlow2].forEach(flow=>{
+      flow.items.forEach(m=>{
+        const spd = lerp(0.0, 0.01, tr);
+        m.userData.t += spd; if(m.userData.t>1) m.userData.t-=1;
+        m.position.copy(flow.pA).lerp(flow.pB, m.userData.t);
+        m.visible = tr > 0.08;
+        m.material.opacity = raColor;
+      });
+    });
+    returnArrowHead.visible = tr > 0.5;
+    if(returnArrowHead.visible) returnArrowHead.setColor(new THREE.Color(0xC2185B).lerp(new THREE.Color(0xE91E63), tr));
+    // Supply particles always flow, color blends bad->good
+    const supColor = new THREE.Color(0xFF9142).lerp(new THREE.Color(0x00BCD4), tr);
+    supFlow.items.forEach(m=>{
+      m.userData.t += 0.0065; if(m.userData.t>1) m.userData.t-=1;
+      const p = supFlow.curve.getPoint(m.userData.t); m.position.copy(p);
+      m.material.color.copy(supColor);
+    });
+    supFlowDrop.items.forEach(m=>{
+      m.userData.t += 0.008; if(m.userData.t>1) m.userData.t-=1;
+      m.position.copy(supFlowDrop.pA).lerp(supFlowDrop.pB, m.userData.t);
+      m.material.color.copy(supColor);
+    });
+    supplyTubeTop.material.color.copy(supColor);
+    dropTube.material.color.copy(supColor);
+    supplyArrowHead.setColor(supColor);
+
+    // seal cap fades/shrinks away as proposed activates
+    sealCap.scale.setScalar(Math.max(0.001, 1-tr*1.3));
+    sealCap.visible = tr < 0.75;
+    sealLabel.visible = labelsVisible && (tr < 0.5);
+
+    // mixing-point glow: fades in once return is opened, pulses gently
+    const mixPulse = 0.55 + 0.25*Math.sin(performance.now()*0.004);
+    mixGlow.material.opacity = Math.max(0, (tr-0.4)/0.6) * mixPulse;
+    mixGlow.scale.setScalar(1 + 0.15*Math.sin(performance.now()*0.004));
+    mixLabel.visible = labelsVisible && tr > 0.75;
+    sealLabel.material.opacity = Math.max(0, 1-tr*1.8);
+
+    // room temp sprite + color
+    const roomTemp = lerp(24.5, 20.6, tr);
+    const roomColor = tr>0.6 ? '#0d6b46' : '#b91c2c';
+    const roomBg = tr>0.6 ? 'rgba(224,250,239,0.92)' : 'rgba(255,255,255,0.92)';
+    updateSpriteText(roomTempSprite, roomTemp.toFixed(1)+'°C', {color:roomColor, bg:roomBg, border: tr>0.6?'#34D399':'#FF4757', fontSize:46, scale:0.62});
+
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  function updateSpriteText(spr, text, opts){
+    const cnv = spr.material.map.image; const cx = cnv.getContext('2d');
+    cx.clearRect(0,0,cnv.width,cnv.height);
+    cx.fillStyle = opts.bg; cx.fillRect(0,0,cnv.width,cnv.height);
+    cx.strokeStyle = opts.border; cx.lineWidth=3; cx.strokeRect(1.5,1.5,cnv.width-3,cnv.height-3);
+    cx.font = `700 ${opts.fontSize}px ui-sans-serif, Arial`;
+    cx.fillStyle = opts.color; cx.textBaseline='middle';
+    cx.fillText(text, 16, cnv.height/2);
+    spr.material.map.needsUpdate = true;
+  }
+  requestAnimationFrame(animate);
+
+  window.addEventListener('resize', ()=>{
+    W = stage.clientWidth; H = stage.clientHeight;
+    camera.aspect = W/H; camera.updateProjectionMatrix();
+    renderer.setSize(W,H);
+  });
+
+  // =========================================================================
+  // UI wiring (mode toggle + sidebar readouts) — same content as before
+  // =========================================================================
+  const btnE=document.getElementById('btn-existing'), btnP=document.getElementById('btn-proposed');
+  const alertBox=document.getElementById('alertBox');
+
+  function setMode(m){
+    state.target = (m==='proposed')?1:0;
+    btnE.classList.toggle('active', m==='existing');
+    btnP.classList.toggle('active', m==='proposed');
+
+    if(m==='existing'){
+      alertBox.className='alert danger';
+      alertBox.innerHTML='⚠ RETURN AIR PORT SEALED — Unit operates as pure 100% OA, coil sees 110°F entering air continuously with zero margin to correct room temperature · Room stuck at 23–26°C vs 20°C target';
+      setReadouts({
+        raBadge:'SEALED', raStatus:'BLOCKED — NOT DUCTED', raPct:'0 %',
+        mixTemp:'110.0°F / 43.3°C', margin:'~0% (full design load)',
+        roomTemp:'24.5°C', roomBarW:'82%', warn:true
+      });
+    } else {
+      alertBox.className='alert ok';
+      alertBox.innerHTML='✓ RETURN DUCT CONNECTED — Coil now sees a blended ~25% OA / 75% return mixture at ~84.5°F instead of 110°F, restoring real correction margin · Circuit-2 fault still requires separate repair';
+      setReadouts({
+        raBadge:'OPEN & DUCTED', raStatus:'ACTIVE — ~75% of mix', raPct:'75 %',
+        mixTemp:'84.5°F / 29.2°C', margin:'~25–30% margin restored',
+        roomTemp:'20.6°C', roomBarW:'34%', warn:false
+      });
+    }
+  }
+  function setReadouts(d){
+    document.getElementById('v-ra-badge').textContent=d.raBadge;
+    document.getElementById('v-ra-status').textContent=d.raStatus;
+    document.getElementById('v-ra-status').className = d.warn ? 'v warn' : 'v good';
+    document.getElementById('v-ra-pct').textContent=d.raPct;
+    document.getElementById('v-ra-pct').className = d.warn ? 'v warn' : 'v good';
+    document.getElementById('bar-ra').style.width = d.raPct;
+    document.getElementById('bar-ra').style.background = d.warn ? 'var(--ra)' : 'var(--ok)';
+    document.getElementById('v-mix-temp').textContent=d.mixTemp;
+    document.getElementById('v-mix-temp').className = d.warn ? 'v warn' : 'v good';
+    document.getElementById('v-margin').textContent=d.margin;
+    document.getElementById('v-margin').className = d.warn ? 'v warn' : 'v good';
+    document.getElementById('v-room-temp').textContent=d.roomTemp;
+    document.getElementById('v-room-temp').className = d.warn ? 'v warn' : 'v good';
+    document.getElementById('bar-room').style.width = d.roomBarW;
+    document.getElementById('bar-room').style.background = d.warn ? 'var(--danger)' : 'var(--ok)';
+  }
+
+  btnE.addEventListener('click', ()=>setMode('existing'));
+  btnP.addEventListener('click', ()=>setMode('proposed'));
+
+  // ---- Show/Hide explanatory labels toggle ----
+  const btnLabels = document.getElementById('btn-toggle-labels');
+  btnLabels.addEventListener('click', ()=>{
+    labelsVisible = !labelsVisible;
+    allLabelSprites.forEach(s=> s.visible = labelsVisible);
+    btnLabels.textContent = labelsVisible ? '🏷 HIDE LABELS' : '🏷 SHOW LABELS';
+    btnLabels.classList.toggle('off', !labelsVisible);
+  });
+})();
+</script>
+</body>
+</html>
+l design load)</span></div>
+      </div>
+
+      <div class="readout-group">
+        <div class="ru-label"><span>Refrigerant Circuits</span><span>2 × R410A</span></div>
+        <div class="ru-row"><span class="k">Circuit-1 (CCT-1)</span><span class="v good" id="v-cct1">NORMAL — cold suction</span></div>
+        <div class="ru-row"><span class="k">Circuit-2 (CCT-2)</span><span class="v warn" id="v-cct2">FAULT — no cooling effect</span></div>
+      </div>
+
+      <div class="readout-group">
+        <div class="ru-label"><span>Room / Department</span><span>TARGET 20°C</span></div>
+        <div class="ru-row"><span class="k">Current temperature</span><span class="v warn" id="v-room-temp">24.5°C</span></div>
+        <div class="bar"><i id="bar-room" style="width:82%; background:var(--danger);"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Model reflects the FAHU-20TR site diagnosis: sealed return port, 100% OA operation, independent Circuit-2 fault.</span>
+    <span>3D scene built with Three.js — geometry is illustrative, not to fabrication scale.</span>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  let W = stage.clientWidth, H = stage.clientHeight;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xEEF1F5);
+  scene.fog = new THREE.Fog(0xEEF1F5, 30, 60);
+
+  const camera = new THREE.PerspectiveCamera(38, W/H, 0.1, 200);
+  camera.position.set(9, 9, 17);
+  camera.lookAt(0,1.5,0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(W,H); renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled = true;
+  stage.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.minDistance = 10; controls.maxDistance = 36;
+  controls.target.set(0,1.4,0);
+  controls.maxPolarAngle = Math.PI*0.49;
+
+  // ---- lighting ----
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd6dd, 0.7));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
+  key.position.set(10,14,8); key.castShadow = true;
+  key.shadow.mapSize.set(1024,1024);
+  key.shadow.camera.left=-15; key.shadow.camera.right=15; key.shadow.camera.top=15; key.shadow.camera.bottom=-15;
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(-8,6,-6); scene.add(fill);
+
+  // ---- ground ----
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshStandardMaterial({color:0xE4E8EC, roughness:1}));
+  ground.rotation.x = -Math.PI/2; ground.position.y = 0; ground.receiveShadow = true;
+  scene.add(ground);
+  const gridHelper = new THREE.GridHelper(40,40,0xC9D0D7,0xDCE1E6); gridHelper.position.y=0.01; scene.add(gridHelper);
+
+  function edged(mesh, color){
+    const eg = new THREE.EdgesGeometry(mesh.geometry);
+    const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({color: color||0x556270, linewidth:1}));
+    mesh.add(lines);
+  }
+  function box(w,h,d,color,opts){
+    opts = opts||{};
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.55, metalness:0.08, transparent: !!opts.opacity, opacity: opts.opacity!==undefined?opts.opacity:1 });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.castShadow = true; m.receiveShadow = true;
+    if(!opts.noEdge) edged(m, opts.edgeColor);
+    return m;
+  }
+  const allLabelSprites = []; // registry for the show/hide labels toggle
+  function sprite(text, opts){
+    opts = opts || {};
+    const cnv = document.createElement('canvas'); const cx = cnv.getContext('2d');
+    const fontSize = opts.fontSize || 40;
+    cx.font = `700 ${fontSize}px ui-sans-serif, Arial`;
+    const padding = 16;
+    const tw = cx.measureText(text).width;
+    cnv.width = tw + padding*2; cnv.height = fontSize*1.5;
+    cx.font = `700 ${fontSize}px ui-sans-serif, Arial`;
+    cx.fillStyle = opts.bg || 'rgba(255,255,255,0.88)';
+    cx.fillRect(0,0,cnv.width,cnv.height);
+    cx.strokeStyle = opts.border || '#7C8797'; cx.lineWidth=3; cx.strokeRect(1.5,1.5,cnv.width-3,cnv.height-3);
+    cx.fillStyle = opts.color || '#26313d';
+    cx.textBaseline = 'middle';
+    cx.fillText(text, padding, cnv.height/2);
+    const tex = new THREE.CanvasTexture(cnv);
+    const mat = new THREE.SpriteMaterial({ map:tex, depthTest:false });
+    const spr = new THREE.Sprite(mat);
+    const scale = (opts.scale||0.9);
+    spr.scale.set(scale*(cnv.width/cnv.height), scale, 1);
+    spr.renderOrder = 999;
+    if(!opts.excludeFromToggle) allLabelSprites.push(spr);
+    return spr;
+  }
+  function arrow(dir, origin, length, color, headWidth){
+    const a = new THREE.ArrowHelper(dir.clone().normalize(), origin, length, color, length*0.32, headWidth||length*0.16);
+    a.line.material.linewidth = 3;
+    return a;
+  }
+
+  // =========================================================================
+  // AHU CASING — matches the real field unit proportions (single long packaged casing)
+  // =========================================================================
+  const ahuGroup = new THREE.Group();
+  ahuGroup.position.set(0.4, 0, 0);
+  scene.add(ahuGroup);
+
+  const ahuW = 4.6, ahuH = 1.55, ahuD = 1.7;
+  const ahuMesh = box(ahuW, ahuH, ahuD, 0xE7EAED, {edgeColor:0x556270});
+  ahuMesh.position.set(0, ahuH/2, 0);
+  ahuGroup.add(ahuMesh);
+  // door-panel seam lines (front face) — matches the real unit's paneled doors
+  for(let i=1;i<5;i++){
+    const seam = box(0.02, ahuH*0.82, 0.02, 0x9AA5AF, {noEdge:true});
+    seam.position.set(-ahuW/2 + i*(ahuW/5), ahuH/2, ahuD/2+0.01);
+    ahuGroup.add(seam);
+  }
+  const ahuLabel = sprite('ZamilAC — FAHU-20TR', {fontSize:30, scale:0.5, color:'#33404c', bg:'rgba(255,255,255,0.92)'});
+  ahuLabel.position.set(0.4, ahuH+0.45, ahuD/2+0.3);
+  ahuGroup.add(ahuLabel);
+  // internal section tick marks on top (filter / coil / fan hint, subtle)
+  const sectionTicks = [
+    {x:-ahuW/2+ahuW*0.18, label:'FILTER'},
+    {x:-ahuW/2+ahuW*0.45, label:'COIL'},
+    {x:-ahuW/2+ahuW*0.75, label:'FAN'},
+  ];
+  sectionTicks.forEach(s=>{
+    const tick = box(0.02, 0.14, ahuD*0.9, 0x8B95A0, {noEdge:true});
+    tick.position.set(s.x, ahuH+0.01, 0);
+    ahuGroup.add(tick);
+    const lbl = sprite(s.label, {fontSize:22, scale:0.3, color:'#5a6672', bg:'rgba(255,255,255,0.85)'});
+    lbl.position.set(s.x, ahuH+0.28, 0);
+    ahuGroup.add(lbl);
+  });
+  // curb under AHU
+  const ahuCurb = box(ahuW*0.9, 0.22, ahuD*0.85, 0xB9BEC2, {edgeColor:0x8a8f94});
+  ahuCurb.position.set(0, 0.11, 0);
+  ahuGroup.add(ahuCurb);
+
+  // Circuit indicator badges on top of coil section
+  function circuitBadge(label, ok, x){
+    const g = new THREE.Group();
+    const c = box(0.4,0.28,0.05, ok?0x34D399:0xFF4757, {edgeColor:0x2b2b2b});
+    c.position.set(x, ahuH+0.55, ahuD/2-0.3);
+    g.add(c);
+    const lbl = sprite(label+': '+(ok?'COLD':'NOT COLD'), {fontSize:24, scale:0.32, color: ok? '#0d6b46':'#8f1d29', bg: ok? 'rgba(217,250,235,0.95)':'rgba(255,224,224,0.95)', border: ok?'#34D399':'#FF4757'});
+    lbl.position.set(x, ahuH+0.9, ahuD/2-0.3);
+    g.add(lbl);
+    return g;
+  }
+  const cctBaseX = -ahuW/2+ahuW*0.45;
+  ahuGroup.add(circuitBadge('CCT-1', true, cctBaseX-0.42));
+  ahuGroup.add(circuitBadge('CCT-2', false, cctBaseX+0.42));
+
+  // fan (inside FAN section, visible through a small cutaway hint)
+  const fanWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.1,24), new THREE.MeshStandardMaterial({color:0x8B95A0, metalness:0.5, roughness:0.4}));
+  fanWheel.rotation.x = Math.PI/2; fanWheel.position.set(-ahuW/2+ahuW*0.75, ahuH*0.55, ahuD/2+0.03);
+  ahuGroup.add(fanWheel);
+
+  // =========================================================================
+  // CONDENSING UNIT (ACCU) — positioned to the right, matching the field photo
+  // =========================================================================
+  const accuGroup = new THREE.Group();
+  accuGroup.position.set(5.7, 0, -0.15);
+  scene.add(accuGroup);
+  const accuW=1.9, accuH=1.9, accuD=1.7;
+  const accuMesh = box(accuW, accuH, accuD, 0xEDEFF1, {edgeColor:0x556270});
+  accuMesh.position.set(0, accuH/2, 0);
+  accuGroup.add(accuMesh);
+  // coil louvre hint (front face grille lines)
+  for(let i=0;i<10;i++){
+    const line = box(accuW*0.82, 0.015, 0.01, 0x9AA5AF, {noEdge:true});
+    line.position.set(0, 0.25+i*0.11, accuD/2+0.01);
+    accuGroup.add(line);
+  }
+  // two round fan cowls on top (matches photo)
+  [ -accuW*0.25, accuW*0.25 ].forEach(dx=>{
+    const cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.46,0.22,24), new THREE.MeshStandardMaterial({color:0x2b2f33, metalness:0.4, roughness:0.5}));
+    cowl.position.set(dx, accuH+0.11, 0); cowl.castShadow=true;
+    accuGroup.add(cowl);
+    const grille = new THREE.Mesh(new THREE.TorusGeometry(0.3,0.02,8,20), new THREE.MeshStandardMaterial({color:0x111417}));
+    grille.rotation.x=Math.PI/2; grille.position.set(dx, accuH+0.23, 0);
+    accuGroup.add(grille);
+  });
+  const accuLabel = sprite('ZamilAC — ACCU', {fontSize:28, scale:0.46, color:'#33404c', bg:'rgba(255,255,255,0.92)'});
+  accuLabel.position.set(0, accuH+0.75, accuD/2+0.2);
+  accuGroup.add(accuLabel);
+  const accuCurb = box(accuW*0.9, 0.22, accuD*0.85, 0xB9BEC2, {edgeColor:0x8a8f94});
+  accuCurb.position.set(0, 0.11, 0);
+  accuGroup.add(accuCurb);
+
+  // refrigerant piping between AHU and ACCU
+  function pipeBetween(p0,p1,radius,color){
+    const dir = new THREE.Vector3().subVectors(p1,p0);
+    const len = dir.length();
+    const geo = new THREE.CylinderGeometry(radius,radius,len,10);
+    const mat = new THREE.MeshStandardMaterial({color, metalness:0.3, roughness:0.4});
+    const m = new THREE.Mesh(geo,mat); m.castShadow=true;
+    m.position.copy(p0).addScaledVector(dir,0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    return m;
+  }
+  const pipeA0 = new THREE.Vector3(ahuW/2-0.2, ahuH*0.6, ahuD/2-0.3).add(ahuGroup.position);
+  const pipeA1 = new THREE.Vector3(-accuW/2+0.15, accuH*0.5, accuD/2-0.3).add(accuGroup.position);
+  scene.add(pipeBetween(pipeA0,pipeA1,0.035,0x8a95a0));
+  const pipeB0 = pipeA0.clone().add(new THREE.Vector3(0,0.12,0));
+  const pipeB1 = pipeA1.clone().add(new THREE.Vector3(0,0.12,0));
+  scene.add(pipeBetween(pipeB0,pipeB1,0.03,0xb5bcc2));
+
+  // =========================================================================
   // ROOF SLAB + "TO DEPARTMENT" indicator (room is below roof, not modeled in 3D)
   // =========================================================================
   const roomTempSprite = sprite('24.5°C', {fontSize:46, scale:0.62, color:'#b91c2c', bg:'rgba(255,255,255,0.92)', border:'#FF4757'});
